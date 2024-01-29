@@ -1,6 +1,7 @@
 import torch
 from talkingface.utils import EvaluatorType
 
+
 class AbstractMetric(object):
     """:class:`AbstractMetric` is the base object of all metrics. If you want to
         implement a metric, you should inherit this class.
@@ -23,18 +24,20 @@ class AbstractMetric(object):
         Returns:
             dict: such as ``{LSE-C': 0.0000}``
         """
-        raise NotImplementedError("Method [calculate_metric] should be implemented.")
-    
+        raise NotImplementedError(
+            "Method [calculate_metric] should be implemented.")
+
 
 class SyncMetric(AbstractMetric):
     """Base class for all Sync metrics. If you want to implement a sync metric, you can inherit this class.
     """
-    
+
     metric_type = EvaluatorType.SYNC
     metric_need = ["generated_video"]
+
     def __init__(self, config):
         super(SyncMetric, self).__init__(config)
-    
+
     def get_videolist(self, dataobject):
         """Get the list of videos.
 
@@ -55,19 +58,22 @@ class SyncMetric(AbstractMetric):
         Returns:
             dict: {"LSE-C": LSE_C, "LSE-D": LSE_D}
         """
-        raise NotImplementedError("Method [metric_info] should be implemented.")
-    
+        raise NotImplementedError(
+            "Method [metric_info] should be implemented.")
+
+
 class VideoQMetric(AbstractMetric):
     """Base class for all Video Quality metrics. If you want to implement a Video Quality metric, you can inherit this class.
     """
 
     metric_type = EvaluatorType.VIDEOQ
+
     def __init__(self, config):
         super(VideoQMetric, self).__init__(config)
 
     def get_videopair(self, dataobject):
         return list(zip(dataobject["generated_video"], dataobject["real_video"]))
-    
+
     def metric_info(self, dataobject):
         """Calculate the value of the metric.
 
@@ -77,8 +83,9 @@ class VideoQMetric(AbstractMetric):
         Returns:
             float: the value of the metric.
         """
-        raise NotImplementedError("Method [metric_info] should be implemented.")
-    
+        raise NotImplementedError(
+            "Method [metric_info] should be implemented.")
+
 # class AudioQMetric(AbstractMetric):
 #     """Base class for all Audio Quality metrics. If you want to implement a Audio Quality metric, you can inherit this class.
 #     """
@@ -95,4 +102,3 @@ class VideoQMetric(AbstractMetric):
 #             float: the value of the metric.
 #         """
 #         raise NotImplementedError("Method [metric_info] should be implemented.")
-

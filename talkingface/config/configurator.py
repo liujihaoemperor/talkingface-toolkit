@@ -5,7 +5,7 @@ import yaml
 from logging import getLogger
 from typing import Literal
 
-from talkingface.utils import(
+from talkingface.utils import (
     get_model,
     # Enum,
     # ModelType,
@@ -15,6 +15,7 @@ from talkingface.utils import(
     evaluation_arguments,
     set_color
 )
+
 
 class Config(object):
     """Configurator module that load the defined parameters.
@@ -63,14 +64,16 @@ class Config(object):
         self._init_parameters_category()
         self.yaml_loader = self._build_yaml_loader()
         self.file_config_dict = self._load_config_files(config_file_list)
-        self.variable_config_dict = self._load_variable_config_dict(config_dict)
+        self.variable_config_dict = self._load_variable_config_dict(
+            config_dict)
         self.cmd_config_dict = self._load_cmd_line()
         self._merge_external_config_dict()
 
         self.model, self.model_class, self.dataset = self._get_model_and_dataset(
             model, dataset
-        ) 
-        self._load_internal_config_dict(self.model, self.model_class, self.dataset)
+        )
+        self._load_internal_config_dict(
+            self.model, self.model_class, self.dataset)
         self.final_config_dict = self._get_final_config_dict()
         self._set_default_parameters()
         self._init_device()
@@ -80,7 +83,7 @@ class Config(object):
         self.parameters["General"] = general_arguments
         self.parameters["Training"] = training_arguments
         self.parameters["Evaluation"] = evaluation_arguments
-    
+
     def _build_yaml_loader(self):
         loader = yaml.FullLoader
         loader.add_implicit_resolver(
@@ -98,7 +101,7 @@ class Config(object):
             list("-+0123456789."),
         )
         return loader
-    
+
     def _convert_config_dict(self, config_dict):
         """This function convert the str parameters to their original type."""
         for key in config_dict:
@@ -123,7 +126,7 @@ class Config(object):
                     value = param
             config_dict[key] = value
         return config_dict
-    
+
     def _load_config_files(self, file_list):
         file_config_dict = dict()
         if file_list:
@@ -133,13 +136,13 @@ class Config(object):
                         yaml.load(f.read(), Loader=self.yaml_loader)
                     )
         return file_config_dict
-    
+
     def _load_variable_config_dict(self, config_dict):
         # HyperTuning may set the parameters such as mlp_hidden_size in NeuMF in the format of ['[]', '[]']
         # then config_dict will receive a str '[]', but indeed it's a list []
         # temporarily use _convert_config_dict to solve this problem
         return self._convert_config_dict(config_dict) if config_dict else dict()
-    
+
     def _load_cmd_line(self):
         r"""Read parameters from command line and convert it to str."""
         cmd_config_dict = dict()
@@ -205,23 +208,24 @@ class Config(object):
             final_dataset = dataset
 
         return final_model, final_model_class, final_dataset
-    
+
     def _update_internal_config_dict(self, file):
         with open(file, "r", encoding="utf-8") as f:
             config_dict = yaml.load(f.read(), Loader=self.yaml_loader)
             if config_dict is not None:
                 self.internal_config_dict.update(config_dict)
         return config_dict
+
     def _load_internal_config_dict(self, model, model_class, dataset):
         current_path = os.path.dirname(os.path.realpath(__file__))
-        overall_init_file = os.path.join(current_path, "../properties/overall.yaml")
+        overall_init_file = os.path.join(
+            current_path, "../properties/overall.yaml")
         model_init_file = os.path.join(
             current_path, "../properties/model/" + model + ".yaml"
         )
         dataset_init_file = os.path.join(
             current_path, "../properties/dataset/" + dataset + ".yaml"
         )
-
 
         self.internal_config_dict = dict()
         for file in [
@@ -252,9 +256,11 @@ class Config(object):
         if isinstance(metrics, str):
             self.final_config_dict["metrics"] = [metrics]
 
-        self.final_config_dict["checkpoint_dir"] = self.final_config_dict["checkpoint_dir"] + self.final_config_dict["checkpoint_sub_dir"]
-        
-        self.final_config_dict["temp_dir"] = self.final_config_dict['temp_dir'] +  self.final_config_dict['temp_sub_dir']
+        self.final_config_dict["checkpoint_dir"] = self.final_config_dict["checkpoint_dir"] + \
+            self.final_config_dict["checkpoint_sub_dir"]
+
+        self.final_config_dict["temp_dir"] = self.final_config_dict['temp_dir'] + \
+            self.final_config_dict['temp_sub_dir']
 
     def _init_device(self):
         if isinstance(self.final_config_dict["gpu_id"], tuple):
@@ -262,7 +268,8 @@ class Config(object):
                 map(str, list(self.final_config_dict["gpu_id"]))
             )
         else:
-            self.final_config_dict["gpu_id"] = str(self.final_config_dict["gpu_id"])
+            self.final_config_dict["gpu_id"] = str(
+                self.final_config_dict["gpu_id"])
         gpu_id = self.final_config_dict["gpu_id"]
         os.environ["CUDA_VISIBLE_DEVICES"] = gpu_id
 
@@ -295,7 +302,8 @@ class Config(object):
             args_info += "\n".join(
                 [
                     (
-                        set_color("{}", "cyan") + " =" + set_color(" {}", "yellow")
+                        set_color("{}", "cyan") + " =" +
+                        set_color(" {}", "yellow")
                     ).format(arg, value)
                     for arg, value in self.final_config_dict.items()
                     if arg in self.parameters[category]
@@ -321,7 +329,6 @@ class Config(object):
 
     def __repr__(self):
         return self.__str__()
-
 
     def compatibility_settings(self):
         import numpy as np

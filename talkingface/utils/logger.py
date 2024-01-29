@@ -13,6 +13,7 @@ log_colors_config = {
     "CRITICAL": "red",
 }
 
+
 class RemoveColorFilter(logging.Filter):
     def filter(self, record):
         if record:
@@ -20,8 +21,10 @@ class RemoveColorFilter(logging.Filter):
             record.msg = ansi_escape.sub("", str(record.msg))
         return True
 
+
 def set_color(log, color, highlight=True):
-    color_set = ["black", "red", "green", "yellow", "blue", "pink", "cyan", "white"]
+    color_set = ["black", "red", "green",
+                 "yellow", "blue", "pink", "cyan", "white"]
     try:
         index = color_set.index(color)
     except:
@@ -33,6 +36,7 @@ def set_color(log, color, highlight=True):
         prev_log += "0;3"
     prev_log += str(index) + "m"
     return prev_log + log + "\033[0m"
+
 
 def init_logger(config):
     """
@@ -54,7 +58,8 @@ def init_logger(config):
     ensure_dir(dir_name)
     model_name = os.path.join(dir_name, config["model"])
     ensure_dir(model_name)
-    config_str = "".join([str(key) for key in config.final_config_dict.values()])
+    config_str = "".join([str(key)
+                         for key in config.final_config_dict.values()])
     md5 = hashlib.md5(config_str.encode(encoding="utf-8")).hexdigest()[:6]
     logfilename = "{}/{}-{}-{}-{}.log".format(
         config["model"], config["model"], config["dataset"], get_local_time(), md5
@@ -68,7 +73,8 @@ def init_logger(config):
 
     sfmt = "%(log_color)s%(asctime)-15s %(levelname)s  %(message)s"
     sdatefmt = "%d %b %H:%M"
-    sformatter = colorlog.ColoredFormatter(sfmt, sdatefmt, log_colors=log_colors_config)
+    sformatter = colorlog.ColoredFormatter(
+        sfmt, sdatefmt, log_colors=log_colors_config)
     if config["state"] is None or config["state"].lower() == "info":
         level = logging.INFO
     elif config["state"].lower() == "debug":

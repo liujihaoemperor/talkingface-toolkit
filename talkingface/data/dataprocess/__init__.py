@@ -1,1 +1,1 @@
-from talkingface.data.dataprocess.wav2lip_process import Wav2LipAudio, Wav2LipPreprocessForInference
+from talkingface.data.dataprocess.cotatron_process import G2PConverter, AudioResampler, F0Extractor

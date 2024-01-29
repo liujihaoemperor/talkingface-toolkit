@@ -41,11 +41,13 @@ class NetworkSize(Enum):
     def __int__(self):
         return self.value
 
+
 ROOT = os.path.dirname(os.path.abspath(__file__))
+
 
 class FaceAlignment:
     def __init__(self, landmarks_type, network_size=NetworkSize.LARGE,
-                device='cuda', flip_input=False, face_detector='sfd', verbose=False):
+                 device='cuda', flip_input=False, face_detector='sfd', verbose=False):
         self.device = device
         self.flip_input = flip_input
         self.landmarks_type = landmarks_type
@@ -58,8 +60,9 @@ class FaceAlignment:
 
         # Get the face detector
         face_detector_module = __import__('talkingface.utils.face_detection.detection.' + face_detector,
-                                        globals(), locals(), [face_detector], 0)
-        self.face_detector = face_detector_module.FaceDetector(device=device, verbose=verbose)
+                                          globals(), locals(), [face_detector], 0)
+        self.face_detector = face_detector_module.FaceDetector(
+            device=device, verbose=verbose)
 
     def get_detections_for_batch(self, images):
         images = images[..., ::-1]
@@ -72,7 +75,7 @@ class FaceAlignment:
                 continue
             d = d[0]
             d = np.clip(d, 0, None)
-            
+
             x1, y1, x2, y2 = map(int, d[:-1])
             results.append((x1, y1, x2, y2))
 

@@ -17,7 +17,7 @@ training_arguments = [
     'train'
 ]
 
-evaluation_arguments  = [
+evaluation_arguments = [
     'metrics',
     'temp_dir',
     'evaluate_batch_size',

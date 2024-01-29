@@ -1,5 +1,6 @@
 from enum import Enum
 
+
 class EvaluatorType(Enum):
     """Type for evaluation metrics.
 

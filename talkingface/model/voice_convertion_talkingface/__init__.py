@@ -1,0 +1,2 @@
+from talkingface.model.voice_convertion_talkingface.synthesizer_model import Synthesizer
+from talkingface.model.voice_convertion_talkingface.gta_extractor_model import GtaExtractor

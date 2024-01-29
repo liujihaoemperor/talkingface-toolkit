@@ -16,13 +16,13 @@ from scipy.io import wavfile
 class lrs2Preprocess:
     def __init__(self, config):
         self.config = config
-        self.fa = [face_detection.FaceAlignment(face_detection.LandmarksType._2D, flip_input=False, 
+        self.fa = [face_detection.FaceAlignment(face_detection.LandmarksType._2D, flip_input=False,
                                                 device=f'cuda:{id}') for id in range(config['ngpu'])]
         self.template = 'ffmpeg -loglevel panic -y -i {} -strict -2 {}'
 
     def process_video_file(self, vfile, gpu_id):
         video_stream = cv2.VideoCapture(vfile)
-        
+
         frames = []
         while 1:
             still_reading, frame = video_stream.read()
@@ -30,14 +30,16 @@ class lrs2Preprocess:
                 video_stream.release()
                 break
             frames.append(frame)
-        
+
         vidname = os.path.basename(vfile).split('.')[0]
         dirname = vfile.split('/')[-2]
 
-        fulldir = os.path.join(self.config['preprocessed_root'], dirname, vidname)
+        fulldir = os.path.join(
+            self.config['preprocessed_root'], dirname, vidname)
         os.makedirs(fulldir, exist_ok=True)
 
-        batches = [frames[i:i + self.config['preprocess_batch_size']] for i in range(0, len(frames), self.config['preprocess_batch_size'])]
+        batches = [frames[i:i + self.config['preprocess_batch_size']]
+                   for i in range(0, len(frames), self.config['preprocess_batch_size'])]
 
         i = -1
         for fb in batches:
@@ -49,19 +51,20 @@ class lrs2Preprocess:
                     continue
 
                 x1, y1, x2, y2 = f
-                cv2.imwrite(os.path.join(fulldir, '{}.jpg'.format(i)), fb[j][y1:y2, x1:x2])
-
+                cv2.imwrite(os.path.join(
+                    fulldir, '{}.jpg'.format(i)), fb[j][y1:y2, x1:x2])
 
     def process_audio_file(self, vfile):
         vidname = os.path.basename(vfile).split('.')[0]
         dirname = vfile.split('/')[-2]
 
-        fulldir = os.path.join(self.config['preprocessed_root'], dirname, vidname)
+        fulldir = os.path.join(
+            self.config['preprocessed_root'], dirname, vidname)
         os.makedirs(fulldir, exist_ok=True)
 
         wavpath = os.path.join(fulldir, 'audio.wav')
 
-        command =self.template.format(vfile, wavpath)
+        command = self.template.format(vfile, wavpath)
         subprocess.call(command, shell=True)
 
     def mp_handler(self, job):
@@ -74,8 +77,9 @@ class lrs2Preprocess:
             traceback.print_exc()
 
     def run(self):
-        print(f'Started processing for {self.config["data_root"]} with {self.config["ngpu"]} GPUs')
-        
+        print(
+            f'Started processing for {self.config["data_root"]} with {self.config["ngpu"]} GPUs')
+
         filelist = glob(os.path.join(self.config["data_root"], '*/*.mp4'))
 
         # jobs = [(vfile, i % self.config["ngpu"]) for i, vfile in enumerate(filelist)]
@@ -92,4 +96,3 @@ class lrs2Preprocess:
             except:
                 traceback.print_exc()
                 continue
-

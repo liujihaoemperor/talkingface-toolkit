@@ -1,0 +1,1 @@
+from talkingface.model.text_to_speech_talkingface.cotatron_model import Cotatron

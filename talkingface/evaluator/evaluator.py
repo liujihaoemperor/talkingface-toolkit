@@ -1,5 +1,6 @@
 from talkingface.evaluator.register import metrics_dict
 
+
 class Evaluator(object):
     def __init__(self, config):
         self.config = config
@@ -10,7 +11,7 @@ class Evaluator(object):
             if metric not in metrics_dict:
                 raise ValueError(f"Metric '{metric}' is not defined.")
             self.metric_class[metric] = metrics_dict[metric](self.config)
-    
+
     def evaluate(self, datadict):
 
         result_dict = {}
@@ -18,5 +19,5 @@ class Evaluator(object):
         for metric in self.metrics:
             metric_val = self.metric_class[metric].calculate_metric(datadict)
             result_dict[metric] = metric_val
-        
+
         return result_dict

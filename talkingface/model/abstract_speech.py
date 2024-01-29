@@ -5,6 +5,7 @@ import torch.nn as nn
 import numpy as np
 from talkingface.utils import set_color
 
+
 class AbstractSpeech(nn.Module):
     """Abstract class for talking face model."""
 
@@ -24,7 +25,7 @@ class AbstractSpeech(nn.Module):
             因为有时总loss可能由多个部分组成。xxx代表其它各部分loss
         """
         raise NotImplementedError
-    
+
     def predict(self, interaction):
         r"""Predict the scores between users and items.
 
@@ -35,9 +36,8 @@ class AbstractSpeech(nn.Module):
             video/image numpy/tensor
         """
         raise NotImplementedError
-    
-    def generate_batch():
 
+    def generate_batch():
         """
         根据划分的test_filelist 批量生成数据。
 
@@ -71,5 +71,3 @@ class AbstractSpeech(nn.Module):
             + set_color("\nTrainable parameters", "blue")
             + f": {params}"
         )
-
-

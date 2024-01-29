@@ -2,7 +2,9 @@ import os
 
 from logging import getLogger
 from time import time
-import dlib, json, subprocess
+import dlib
+import json
+import subprocess
 import torch.nn.functional as F
 import glob
 import numpy as np
@@ -14,7 +16,7 @@ import torch.cuda.amp as amp
 from torch import nn
 from pathlib import Path
 
-from talkingface.utils import(
+from talkingface.utils import (
     ensure_dir,
     get_local_time,
     early_stopping,
@@ -38,7 +40,7 @@ class AbstractTrainer(object):
     def __init__(self, config, model):
         self.config = config
         self.model = model
-    
+
     def fit(self, train_data):
         r"""Train the model based on the train data."""
         raise NotImplementedError("Method [next] should be implemented.")
@@ -47,7 +49,7 @@ class AbstractTrainer(object):
         r"""Evaluate the model based on the eval data."""
 
         raise NotImplementedError("Method [next] should be implemented.")
-    
+
 
 class Trainer(AbstractTrainer):
     r"""The basic Trainer for basic training and evaluation strategies in talkingface systems. This class defines common
@@ -62,6 +64,7 @@ class Trainer(AbstractTrainer):
     `model` is the instantiated object of a Model Class.
 
     """
+
     def __init__(self, config, model):
         super(Trainer, self).__init__(config, model)
         self.logger = getLogger()
@@ -70,7 +73,7 @@ class Trainer(AbstractTrainer):
         # self.enable_amp = config["enable_amp"]
         # self.enable_scaler = torch.cuda.is_available() and config["enable_scaler"]
 
-        # config for train 
+        # config for train
         self.learner = config["learner"]
         self.learning_rate = config["learning_rate"]
         self.epochs = config["epochs"]
@@ -81,8 +84,10 @@ class Trainer(AbstractTrainer):
         self.device = config["device"]
         self.checkpoint_dir = config["checkpoint_dir"]
         ensure_dir(self.checkpoint_dir)
-        saved_model_file = "{}-{}.pth".format(self.config["model"], get_local_time())
-        self.saved_model_file = os.path.join(self.checkpoint_dir, saved_model_file)
+        saved_model_file = "{}-{}.pth".format(
+            self.config["model"], get_local_time())
+        self.saved_model_file = os.path.join(
+            self.checkpoint_dir, saved_model_file)
         self.weight_decay = config["weight_decay"]
         self.start_epoch = 0
         self.cur_step = 0
@@ -106,11 +111,14 @@ class Trainer(AbstractTrainer):
             )
 
         if learner.lower() == "adam":
-            optimizer = optim.Adam(params, lr=learning_rate, weight_decay=weight_decay)
+            optimizer = optim.Adam(
+                params, lr=learning_rate, weight_decay=weight_decay)
         elif learner.lower() == "adamw":
-            optimizer = optim.AdamW(params, lr=learning_rate, weight_decay=weight_decay)
+            optimizer = optim.AdamW(
+                params, lr=learning_rate, weight_decay=weight_decay)
         elif learner.lower() == "sgd":
-            optimizer = optim.SGD(params, lr=learning_rate, weight_decay=weight_decay)
+            optimizer = optim.SGD(params, lr=learning_rate,
+                                  weight_decay=weight_decay)
         elif learner.lower() == "adagrad":
             optimizer = optim.Adagrad(
                 params, lr=learning_rate, weight_decay=weight_decay
@@ -151,9 +159,9 @@ class Trainer(AbstractTrainer):
         step = 0
         iter_data = (
             tqdm(
-            train_data,
-            total=len(train_data),
-            ncols=None,
+                train_data,
+                total=len(train_data),
+                ncols=None,
             )
             if show_progress
             else train_data
@@ -180,7 +188,8 @@ class Trainer(AbstractTrainer):
                     else:
                         losses_dict[key] = value.item()
                         total_loss_dict[key] = value.item()
-            iter_data.set_description(set_color(f"train {epoch_idx} {losses_dict}", "pink"))
+            iter_data.set_description(
+                set_color(f"train {epoch_idx} {losses_dict}", "pink"))
 
             self._check_nan(loss)
             loss.backward()
@@ -190,8 +199,6 @@ class Trainer(AbstractTrainer):
             average_loss_dict[key] = value/step
 
         return average_loss_dict
-
-        
 
     def _valid_epoch(self, valid_data, show_progress=False):
         r"""Valid the model with valid data. Different from the evaluate, this is use for training.
@@ -208,16 +215,16 @@ class Trainer(AbstractTrainer):
         total_loss_dict = {}
         iter_data = (
             tqdm(valid_data,
-                total=len(valid_data),
-                ncols=None,
-            )
+                 total=len(valid_data),
+                 ncols=None,
+                 )
             if show_progress
             else valid_data
         )
         step = 0
         for batch_idx, batched_data in enumerate(iter_data):
             step += 1
-            batched_data.to(self.device)    
+            batched_data.to(self.device)
             losses_dict = self.model.calculate_loss(batched_data, valid=True)
             for key, value in losses_dict.items():
                 if key in total_loss_dict:
@@ -234,16 +241,14 @@ class Trainer(AbstractTrainer):
                     else:
                         losses_dict[key] = value.item()
                         total_loss_dict[key] = value.item()
-            iter_data.set_description(set_color(f"Valid {losses_dict}", "pink"))
+            iter_data.set_description(
+                set_color(f"Valid {losses_dict}", "pink"))
         average_loss_dict = {}
         for key, value in total_loss_dict.items():
             average_loss_dict[key] = value/step
 
         return average_loss_dict
-                
 
-
-    
     def _save_checkpoint(self, epoch, verbose=True, **kwargs):
         r"""Store the model parameters information and training information.
 
@@ -251,7 +256,8 @@ class Trainer(AbstractTrainer):
             epoch (int): the current epoch id
 
         """
-        saved_model_file = kwargs.pop("saved_model_file", self.saved_model_file)
+        saved_model_file = kwargs.pop(
+            "saved_model_file", self.saved_model_file)
         state = {
             "config": self.config,
             "epoch": epoch,
@@ -368,19 +374,21 @@ class Trainer(AbstractTrainer):
         if saved and self.start_epoch >= self.epochs:
             self._save_checkpoint(-1, verbose=verbose)
 
-        if not (self.config['resume_checkpoint_path'] == None ) and self.config['resume']:
+        if not (self.config['resume_checkpoint_path'] == None) and self.config['resume']:
             self.resume_checkpoint(self.config['resume_checkpoint_path'])
-        
+
         for epoch_idx in range(self.start_epoch, self.epochs):
             training_start_time = time()
-            train_loss = self._train_epoch(train_data, epoch_idx, show_progress=show_progress)
+            train_loss = self._train_epoch(
+                train_data, epoch_idx, show_progress=show_progress)
             self.train_loss_dict[epoch_idx] = (
-                sum(train_loss) if isinstance(train_loss, tuple) else train_loss
+                sum(train_loss) if isinstance(
+                    train_loss, tuple) else train_loss
             )
             training_end_time = time()
             train_loss_output = self._generate_train_loss_output(
                 epoch_idx, training_start_time, training_end_time, train_loss)
-            
+
             if verbose:
                 self.logger.info(train_loss_output)
             # self._add_train_loss_to_tensorboard(epoch_idx, train_loss)
@@ -392,9 +400,10 @@ class Trainer(AbstractTrainer):
 
             if (epoch_idx + 1) % self.eval_step == 0:
                 valid_start_time = time()
-                valid_loss = self._valid_epoch(valid_data=valid_data, show_progress=show_progress)
+                valid_loss = self._valid_epoch(
+                    valid_data=valid_data, show_progress=show_progress)
 
-                (self.best_valid_score, self.cur_step, stop_flag,update_flag,) = early_stopping(
+                (self.best_valid_score, self.cur_step, stop_flag, update_flag,) = early_stopping(
                     valid_loss['loss'],
                     self.best_valid_score,
                     self.cur_step,
@@ -404,12 +413,12 @@ class Trainer(AbstractTrainer):
                 valid_end_time = time()
 
                 valid_loss_output = (
-                    set_color("valid result", "blue") + ": \n" + dict2str(valid_loss)
+                    set_color("valid result", "blue") +
+                    ": \n" + dict2str(valid_loss)
                 )
                 if verbose:
                     self.logger.info(valid_loss_output)
 
-                
                 if update_flag:
                     if saved:
                         self._save_checkpoint(epoch_idx, verbose=verbose)
@@ -422,6 +431,7 @@ class Trainer(AbstractTrainer):
                     if verbose:
                         self.logger.info(stop_output)
                     break
+
     @torch.no_grad()
     def evaluate(self, load_best_model=True, model_file=None):
         """
@@ -447,7 +457,6 @@ class Trainer(AbstractTrainer):
         self.logger.info(eval_result)
 
 
-
 class Wav2LipTrainer(Trainer):
     def __init__(self, config, model):
         super(Wav2LipTrainer, self).__init__(config, model)
@@ -467,16 +476,14 @@ class Wav2LipTrainer(Trainer):
         """
         self.model.train()
 
-
-
         loss_func = loss_func or self.model.calculate_loss
         total_loss_dict = {}
         step = 0
         iter_data = (
             tqdm(
-            train_data,
-            total=len(train_data),
-            ncols=None,
+                train_data,
+                total=len(train_data),
+                ncols=None,
             )
             if show_progress
             else train_data
@@ -503,7 +510,8 @@ class Wav2LipTrainer(Trainer):
                     else:
                         losses_dict[key] = value.item()
                         total_loss_dict[key] = value.item()
-            iter_data.set_description(set_color(f"train {epoch_idx} {losses_dict}", "pink"))
+            iter_data.set_description(
+                set_color(f"train {epoch_idx} {losses_dict}", "pink"))
 
             self._check_nan(loss)
             loss.backward()
@@ -514,18 +522,16 @@ class Wav2LipTrainer(Trainer):
 
         return average_loss_dict
 
-        
-    
     def _valid_epoch(self, valid_data, loss_func=None, show_progress=False):
         print('Valid'.format(self.eval_step))
         self.model.eval()
         total_loss_dict = {}
         iter_data = (
             tqdm(valid_data,
-                total=len(valid_data),
-                ncols=None,
-                desc=set_color("Valid", "pink")
-            )
+                 total=len(valid_data),
+                 ncols=None,
+                 desc=set_color("Valid", "pink")
+                 )
             if show_progress
             else valid_data
         )
@@ -554,4 +560,3 @@ class Wav2LipTrainer(Trainer):
         if losses_dict["sync_loss"] < .75:
             self.model.config["syncnet_wt"] = 0.01
         return average_loss_dict
-    

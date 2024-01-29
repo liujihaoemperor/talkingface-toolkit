@@ -1,6 +1,7 @@
 import inspect
 import sys
 
+
 def cluster_info(module_name):
     """Collect information of all metrics, including:
 
@@ -30,11 +31,13 @@ def cluster_info(module_name):
         if hasattr(metric_cls, "metric_need"):
             m_info[name] = metric_cls.metric_need
         else:
-            raise AttributeError(f"Metric '{name}' has no attribute [metric_need].")
+            raise AttributeError(
+                f"Metric '{name}' has no attribute [metric_need].")
         if hasattr(metric_cls, "metric_type"):
             m_types[name] = metric_cls.metric_type
         else:
-            raise AttributeError(f"Metric '{name}' has no attribute [metric_type].")
+            raise AttributeError(
+                f"Metric '{name}' has no attribute [metric_type].")
         if metric_cls.smaller is True:
             smaller_m.append(name)
     return smaller_m, m_info, m_types, m_dict
