@@ -1,210 +1,194 @@
-# talkingface-toolkit
-## 框架整体介绍
-### checkpoints
-主要保存的是训练和评估模型所需要的额外的预训练模型，在对应文件夹的[README](https://github.com/Academic-Hammer/talkingface-toolkit/blob/main/checkpoints/README.md)有更详细的介绍
+# <center>语音识别与合成 talkingface-toolkit 小组大作业
 
-### datset
-存放数据集以及数据集预处理之后的数据，详细内容见dataset里的[README](https://github.com/Academic-Hammer/talkingface-toolkit/blob/main/dataset/README.md)
+## 1	模型项目基本概述
 
-### saved
-存放训练过程中保存的模型checkpoint, 训练过程中保存模型时自动创建
+​		语音转换 VC 研究集中在保留节奏、语调以及语言内容。为了从源头上保留这些特性，原项目将当前的非并行 VC 系统分解为两个编码器和一个解码器。通过多次实验分析每个模块，并重新组装最佳组件，提出了 Assem-VC，这是一种全新的最先进的任意多对多非并行 VC 系统。此外，PPG 和 Cotatron 特性依赖于说话者，因此该项目尝试通过对抗性训练去除说话者身份。
 
-### talkingface
-主要功能模块，包括所有核心代码
+​		具体地，代码和音频样本可在 https://github.com/mindslab-ai/assem-vc 获得。本次作业旨在将原始项目的代码重构到 talkingface-toolkit 框架并能够正常完成训练和推理等功能。
 
-#### config
-根据模型和数据集名称自动生成所有模型、数据集、训练、评估等相关的配置信息
-```
-config/
+## 2	环境配置与依赖库
 
-├── configurator.py
+​		本项目作业通过 Conda 实现 Python 虚拟环境的构建，版本为 3.6.8。对于依赖库，可根据 requirements.txt 文件进行安装，具体路径见 ./requirements.txt，其中指定了各个库的名称和对应版本，支持在 Terminal 进入环境下使用 pip install 命令安装。
 
-```
-#### data
-- dataprocess：模型特有的数据处理代码，（可以是对方仓库自己实现的音频特征提取、推理时的数据处理）。如果实现的模型有这个需求，就要建立一对应的文件
-- dataset：每个模型都要重载`torch.utils.data.Dataset` 用于加载数据。每个模型都要有一个`model_name+'_dataset.py'`文件. `__getitem__()`方法的返回值应处理成字典类型的数据。 <span style="color:red">(核心部分)</span>
-```
-data/
+## 3	重构功能与实现
 
-├── dataprocess
+​		根据原始项目以及新的 talkingface 框架架构可见，项目具体地分为数据、模型与训练两个部分便于说明。
 
-| ├── wav2lip_process.py
+### 3.1	数据
 
-| ├── xxxx_process.py
+​		项目使用的数据集为 LibriTTS train-clean-100 和 VCTK dataset 0.8.0，它们所对应的获取网络地址是 http://www.openslr.org/resources/60/train-clean-100.tar.gz 和 https://datashare.ed.ac.uk/handle/10283/2651。数据集的主要数据格式为 .wav 文件，存放在 dataset 文件夹下，其原始内容需要经过特定的预处理步骤，为人声音频的描述，具体实验中划分为 train、test、val 三个部分以完成基本的训练需求。
 
-├── dataset
+​		在代码重构方面，talkingface 中的 data 内分别完成了预处理和数据集操作的两个核心部分，并分别对应 dataprocess 和 dataset，具体组织如下：
 
-| ├── wav2lip_dataset.py
+![image-20240129233251066](C:/Users/lhpc/AppData/Roaming/Typora/typora-user-images/image-20240129233251066.png)
 
-| ├── xxx_dataset.py
-```
+​		其中，预处理主要通过 G2PConverter、AudioResampler 和 F0Extractor 三个类完成，该部分截图如下所示：
 
-#### evaluate
-主要涉及模型评估的代码
-LSE metric 需要的数据是生成的视频列表
-SSIM metric 需要的数据是生成的视频和真实的视频列表
+![image-20240129231940238](C:/Users/lhpc/AppData/Roaming/Typora/typora-user-images/image-20240129231940238.png)
 
-#### model
-实现的模型的网络和对应的方法 <span style="color:red">（核心部分）</span>
+![image-20240129232020852](C:/Users/lhpc/AppData/Roaming/Typora/typora-user-images/image-20240129232020852.png)
 
-主要分三类：
-- audio-driven (音频驱动)
-- image-driven （图像驱动）
-- nerf-based （基于神经辐射场的方法）
+![image-20240129232052430](C:/Users/lhpc/AppData/Roaming/Typora/typora-user-images/image-20240129232052430.png)
 
-```
-model/
+​		可以证明其已处理完毕，重采样频率为 22050 后命名格式也与原数据格式变化，修饰后缀 -22k.wav。
 
-├── audio_driven_talkingface
+​		dataset 部分则构建 TextMelDataset 类以继承原框架的 Dataset 抽象类完成相关组织数据集部分的代码整合，具体内容见项目。
 
-| ├── wav2lip.py
+### 3.2	模型与训练
 
-├── image_driven_talkingface
+​		原始项目的模型主要有三个部分，Cotatron、Synthesis、GTA Extractor 分别扮演着不同的功能角色。以下是对每个模块的功能的解析：
 
-| ├── xxxx.py
+1. **Cotatron**:
+   - **功能**：Cotatron用于语音的文本到语音对齐。它负责将输入的文本序列与语音信号进行对齐，以获得语音中每个时间步的语音特征。
+   - **角色**：作为语言编码器，Cotatron的输出用于捕获语音的语音特征，用于后续的语音合成过程。
+2. **Synthesis**:
+   - **功能**：合成模块负责将源说话者的语音特征转换为目标说话者的语音特征，实现说话者之间的语音转换。
+   - **角色**：在Assem-VC中，这一阶段的模块主要包括语调编码器、解码器和声码器，负责实际的语音合成过程。
+3. **GTA Extractor** (GTA：Ground Truth Alignment)：
+   - **功能**：GTA Extractor用于提取Ground Truth Alignment，即从转换后的语音中获取对齐信息。
+   - **角色**：在GTA微调阶段，GTA Extractor的输出被用于微调HiFi-GAN声码器，以进一步提高生成语音的质量。
 
-├── nerf_based_talkingface
+​		它们被置于 talkingface 框架下 model 中的具体类别，按照分类放置的原则，Cotatron 属于 text to speech 类别，另外两个部分则属于 voice convertion，具体组织如下：
 
-| ├── xxxx.py
+![image-20240129233155554](C:/Users/lhpc/AppData/Roaming/Typora/typora-user-images/image-20240129233155554.png)
 
-├── abstract_talkingface.py
+​		根据上述项目结构，在训练方面，重构部分在 trainer 下的 model_sum_trainer 一方面完成了上述三个模型类的对应训练代码，另一方面整合了大量训练模型的相关方法。其中，三段训练的截图验证如下所示：
 
-```
+![image-20240129234628479](C:/Users/lhpc/AppData/Roaming/Typora/typora-user-images/image-20240129234628479.png)
 
-#### properties
-保存默认配置文件，包括：
-- 数据集配置文件
-- 模型配置文件
-- 通用配置文件
+![image-20240129234637216](C:/Users/lhpc/AppData/Roaming/Typora/typora-user-images/image-20240129234637216.png)
 
-需要根据对应模型和数据集增加对应的配置文件，通用配置文件`overall.yaml`一般不做修改
-```
-properties/
+![image-20240129234646340](C:/Users/lhpc/AppData/Roaming/Typora/typora-user-images/image-20240129234646340.png)
 
-├── dataset
+​		然后，通过原项目提供的辅助预训练模型 https://drive.google.com/drive/folders/1aIl8ObHxsmsFLXBz-y05jMBN4LrpQejm?usp=sharing 和训练保存的 checkpoints 模型以完成推理预测部分，并且在重构代码中能够同样地调用，该部分流程具体截图如下：
 
-| ├── xxx.yaml
+![image-20240129234614379](C:/Users/lhpc/AppData/Roaming/Typora/typora-user-images/image-20240129234614379.png)
 
-├── model
+​		以上是获取所需的预训练模型。
 
-| ├── xxx.yaml
+![](C:/Users/lhpc/AppData/Roaming/Typora/typora-user-images/image-20240129234451722.png)
 
-├── overall.yaml
+![image-20240129235236829](C:/Users/lhpc/AppData/Roaming/Typora/typora-user-images/image-20240129235236829.png)
 
-```
+![image-20240129235251692](C:/Users/lhpc/AppData/Roaming/Typora/typora-user-images/image-20240129235251692.png)
 
-#### quick_start
-通用的启动文件，根据传入参数自动配置数据集和模型，然后训练和评估（一般不需要修改）
-```
-quick_start/
+​		以上为预测音频的生成，原始 Mel 频谱与预测部分的可视化对比，以及输出波形图，具体的文件均保存在 result 文件夹下，证明截图如下：
 
-├── quick_start.py
+![image-20240129235456578](C:/Users/lhpc/AppData/Roaming/Typora/typora-user-images/image-20240129235456578.png)
 
-```
+​		综上部分，在 properties 中重新整合了 .yaml 格式的三个 config 配置文件，控制训练等过程的参数等设置。此外，以 quick_start 模块和 run_talkingface.py 相契合的数据结构形式把以上内容组织起来，能够以 python 命令形式走完从数据处理组织到模型训练预测等步骤的全流程。
 
-#### trainer
-训练、评估函数的主类。在trainer中，如果可以使用基类`Trainer`实现所有功能，则不需要写一个新的。如果模型训练有一些特有部分，则需要重载`Trainer`。需要重载部分可能主要集中于: `_train_epoch()`, `_valid_epoch()`。 重载的`Trainer`应该命名为：`{model_name}Trainer`
-```
-trainer/
+## 4	额外优化与改进
 
-├── trainer.py
+​		在基本要求全部完成后，我们对重构后的项目部分涉及模型训练的部分进行了额外的改进和优化，主要包括两个部分：Attention 类的注意力机制优化、
 
+### 4.1	Attention 类的注意力机制优化
+
+​		关于对 Attention 类的改进，这个注意力机制与训练过程相关，其使用了传统的 masked 式注意力方法，对此有以下优化，以增强其在具体情境下的上下文联系能力。
+
+- 创建一个新的类 `MultiHeadAttention`，它包含多个 `Attention` 头。
+- `num_heads` 参数决定了使用的注意力头的数量。
+
+```python
+class MultiHeadAttention(nn.Module):
+    def __init__(self, num_heads, attn_rnn_dim, attn_dim, static_channels, static_kernel_size,
+                 dynamic_channels, dynamic_kernel_size, causal_n, causal_alpha, causal_beta, dropout_prob):
+        super(MultiHeadAttention, self).__init__()
+        self.num_heads = num_heads
+
+        # Define multiple attention heads
+        self.attention_heads = nn.ModuleList([
+            Attention(attn_rnn_dim, attn_dim, static_channels, static_kernel_size,
+                      dynamic_channels, dynamic_kernel_size, causal_n, causal_alpha, causal_beta)
+            for _ in range(num_heads)
+        ])
+
+        # Dropout layer
+        self.dropout = nn.Dropout(p=dropout_prob)
 ```
 
-#### utils
-公用的工具类，包括`s3fd`人脸检测，视频抽帧、视频抽音频方法。还包括根据参数配置找对应的模型类、数据类等方法。
-一般不需要修改，但可以适当添加一些必须的且相对普遍的数据处理文件。
+- 在 `forward` 方法中，对每个注意力头调用其 `forward` 方法。
+- 将所有注意力头的输出沿着特征维度进行堆叠。
+- 使用平均池化 `torch.mean`  方法对多头的输出进行池化。
+- 应用 dropout，以防止过拟合。
 
-## 使用方法
-### 环境要求
-- `python=3.8`
-- `torch==1.13.1+cu116`（gpu版，若设备不支持cuda可以使用cpu版）
-- `numpy==1.20.3`
-- `librosa==0.10.1`
+```python
+    def forward(self, attn_hidden, memory, prev_attn, mask):
+        # Apply each attention head separately
+        attention_heads_output = [head(attn_hidden, memory, prev_attn, mask)[0] for head in self.attention_heads]
 
-尽量保证上面几个包的版本一致
+        # Concatenate attention head outputs along the feature dimension
+        combined_output = torch.stack(attention_heads_output, dim=-1)
+        combined_output = torch.mean(combined_output, dim=-1)  # Average pooling
 
-提供了两种配置其他环境的方法：
-```
-pip install -r requirements.txt
+        # Apply dropout
+        combined_output = self.dropout(combined_output)
 
-or
-
-conda env create -f environment.yml
+        return combined_output, None  # Return None for attn_weights for simplicity
 ```
 
-建议使用conda虚拟环境！！！
+​		这种改进的主要思想是将多个 Attention 头组合在一起，以捕获更丰富的信息，并通过平均池化对这些头的输出进行整合，并且添加了 dropout 来防止过拟合，综合来说增强了该类的实现功能。
 
-### 训练和评估
+### 4.2	引导注意力丧失的改进
 
-```bash
-python run_talkingface.py --model=xxxx --dataset=xxxx (--other_parameters=xxxxxx)
+​		原始代码中，使用了引导注意力丧失来辅助加速 Cotatron 的训练过程以达到更快地收敛，我们对这一机制进行了优化，以下是两个主要的思路方向。
+
+- **性能优化：** 使用 PyTorch 的向量化操作和内置函数，以提高计算效率。
+- **数值稳定性：** 使用 PyTorch 提供的稳定数学操作，减少数值稳定性问题。
+
+```python
+import torch
+
+class GuidedAttentionLoss(torch.nn.Module):
+    def __init__(self, guided_att_steps, guided_att_variance, guided_att_gamma):
+        self._guided_att_steps = guided_att_steps
+        self._guided_att_variance = guided_att_variance
+        self._guided_att_gamma = guided_att_gamma
+
+    def set_guided_att_steps(self, guided_att_steps):
+        self._guided_att_steps = guided_att_steps
+
+    def set_guided_att_variance(self, guided_att_variance):
+        self._guided_att_variance = guided_att_variance
+
+    def set_guided_att_gamma(self, guided_att_gamma):
+        self._guided_att_gamma = guided_att_gamma
+
+    def forward(self, alignments, input_lengths, target_lengths, global_step):
+        if self._guided_att_steps < global_step:
+            return 0
+
+        self._guided_att_variance = self._guided_att_gamma ** global_step
+
+        weights = self._compute_guided_attention_weights(
+            alignments, input_lengths, target_lengths)
+
+        loss = torch.sum(weights * alignments) / target_lengths.float().sum()
+
+        return loss
+
+    def _compute_guided_attention_weights(self, alignments, input_lengths, target_lengths):
+        weights = torch.zeros_like(alignments)
+        for i, (f, l) in enumerate(zip(target_lengths, input_lengths)):
+            grid_f, grid_l = torch.meshgrid(
+                torch.arange(f, dtype=torch.float, device=f.device),
+                torch.arange(l, dtype=torch.float, device=l.device))
+            weights[i, :f, :l] = 1 - torch.exp(
+                -((grid_l / l - grid_f / f) ** 2) / (2 * self._guided_att_variance ** 2))
+        return weights
 ```
 
-### 权重文件
+​		通过使用向量化操作和 PyTorch 内置函数，我们观察到代码的计算效率得到了提高。在相同的训练步骤下，优化后的代码在数值稳定性方面也表现更好。
 
-- LSE评估需要的权重: syncnet_v2.model [百度网盘下载](https://pan.baidu.com/s/1vQoL9FuKlPyrHOGKihtfVA?pwd=32hc)
-- wav2lip需要的lip expert 权重：lipsync_expert.pth [百度网下载](https://pan.baidu.com/s/1vQoL9FuKlPyrHOGKihtfVA?pwd=32hc)
+## 5	成员分工
 
-## 可选论文：
-### Aduio_driven talkingface
-| 模型简称 | 论文 | 代码仓库 |
-|:--------:|:--------:|:--------:|
-| MakeItTalk | [paper](https://arxiv.org/abs/2004.12992) | [code](https://github.com/yzhou359/MakeItTalk) |
-| MEAD | [paper](https://wywu.github.io/projects/MEAD/support/MEAD.pdf) | [code](https://github.com/uniBruce/Mead) |
-| RhythmicHead | [paper](https://arxiv.org/pdf/2007.08547v1.pdf) | [code](https://github.com/lelechen63/Talking-head-Generation-with-Rhythmic-Head-Motion) |
-| PC-AVS | [paper](https://arxiv.org/abs/2104.11116) | [code](https://github.com/Hangz-nju-cuhk/Talking-Face_PC-AVS) |
-| EVP | [paper](https://openaccess.thecvf.com/content/CVPR2021/papers/Ji_Audio-Driven_Emotional_Video_Portraits_CVPR_2021_paper.pdf) | [code](https://github.com/jixinya/EVP) |
-| LSP | [paper](https://arxiv.org/abs/2109.10595) | [code](https://github.com/YuanxunLu/LiveSpeechPortraits) |
-| EAMM | [paper](https://arxiv.org/pdf/2205.15278.pdf) | [code](https://github.com/jixinya/EAMM/) |
-| DiffTalk | [paper](https://arxiv.org/abs/2301.03786) | [code](https://github.com/sstzal/DiffTalk) |
-| TalkLip | [paper](https://arxiv.org/pdf/2303.17480.pdf) | [code](https://github.com/Sxjdwang/TalkLip) |
-| EmoGen | [paper](https://arxiv.org/pdf/2303.11548.pdf) | [code](https://github.com/sahilg06/EmoGen) |
-| SadTalker | [paper](https://arxiv.org/abs/2211.12194) | [code](https://github.com/OpenTalker/SadTalker) |
-| HyperLips | [paper](https://arxiv.org/abs/2310.05720) | [code](https://github.com/semchan/HyperLips) |
-| PHADTF | [paper](http://arxiv.org/abs/2002.10137) | [code](https://github.com/yiranran/Audio-driven-TalkingFace-HeadPose) |
-| VideoReTalking | [paper](https://arxiv.org/abs/2211.14758) | [code](https://github.com/OpenTalker/video-retalking#videoretalking--audio-based-lip-synchronization-for-talking-head-video-editing-in-the-wild-)
-|                                 |
+​		本小组成员包括：吴隽恺（组长，学号 1120213607）、刘吉昊（组员，学号 1120212843）、王治桐（组员，学号 1120212171）。具体分工如下：
 
+- 吴隽恺：主要负责训练和预测相关的代码重构，即 train 目录下的内容，对上述三个模型的训练、推理预测、统合模型与相关机制引入等部分进行重构和整合实现；设计并完成了上述两项对原重构结果的额外优化与改进。
+- 刘吉昊：主要负责数据相关的代码重构，即 data 目录下的内容，对上述数据集预处理、设计字典结构、组织编码等部分进行重构与整合实现。
+- 王治桐：主要负责模型相关的代码重构，即 model 目录下的内容，对上述三个模型的架构搭建、抽象类继承和具体的内容功能设计完成了重构与整合。
+- 注：未说明的其他杂项部分由三名小组成员共同合作完成。
 
+## 6	附加说明
 
-### Image_driven talkingface
-| 模型简称 | 论文 | 代码仓库 |
-|:--------:|:--------:|:--------:|
-| PIRenderer | [paper](https://arxiv.org/pdf/2109.08379.pdf) | [code](https://github.com/RenYurui/PIRender) |
-| StyleHEAT | [paper](https://arxiv.org/pdf/2203.04036.pdf) | [code](https://github.com/OpenTalker/StyleHEAT) |
-| MetaPortrait | [paper](https://arxiv.org/abs/2212.08062) | [code](https://github.com/Meta-Portrait/MetaPortrait) |
-|                                 |
-### Nerf-based talkingface
-| 模型简称 | 论文 | 代码仓库 |
-|:--------:|:--------:|:--------:|
-| AD-NeRF | [paper](https://arxiv.org/abs/2103.11078) | [code](https://github.com/YudongGuo/AD-NeRF) |
-| GeneFace | [paper](https://arxiv.org/abs/2301.13430) | [code](https://github.com/yerfor/GeneFace) |
-| DFRF | [paper](https://arxiv.org/abs/2207.11770) | [code](https://github.com/sstzal/DFRF) |
-|                                 |
-### text_to_speech
-| 模型简称 | 论文 | 代码仓库 |
-|:--------:|:--------:|:--------:|
-| VITS | [paper](https://arxiv.org/abs/2106.06103) | [code](https://github.com/jaywalnut310/vits) |
-| Glow TTS | [paper](https://arxiv.org/abs/2005.11129) | [code](https://github.com/jaywalnut310/glow-tts) |
-| FastSpeech2 | [paper](https://arxiv.org/abs/2006.04558v1) | [code](https://github.com/ming024/FastSpeech2) |
-| StyleTTS2 | [paper](https://arxiv.org/abs/2306.07691) | [code](https://github.com/yl4579/StyleTTS2) |
-| Grad-TTS | [paper](https://arxiv.org/abs/2105.06337) | [code](https://github.com/huawei-noah/Speech-Backbones/tree/main/Grad-TTS) | 
-| FastSpeech | [paper](https://arxiv.org/abs/1905.09263) | [code](https://github.com/xcmyz/FastSpeech) |
-|                                 |
-### voice_conversion
-| 模型简称 | 论文 | 代码仓库 |
-|:--------:|:--------:|:--------:|
-| StarGAN-VC | [paper](http://www.kecl.ntt.co.jp/people/kameoka.hirokazu/Demos/stargan-vc2/index.html) | [code](https://github.com/kamepong/StarGAN-VC) |
-| Emo-StarGAN | [paper](https://www.researchgate.net/publication/373161292_Emo-StarGAN_A_Semi-Supervised_Any-to-Many_Non-Parallel_Emotion-Preserving_Voice_Conversion) | [code](https://github.com/suhitaghosh10/emo-stargan) |
-| adaptive-VC | [paper](https://arxiv.org/abs/1904.05742) | [code](https://github.com/jjery2243542/adaptive_voice_conversion) |
-| DiffVC | [paper](https://arxiv.org/abs/2109.13821) | [code](https://github.com/huawei-noah/Speech-Backbones/tree/main/DiffVC) |
-| Assem-VC | [paper](https://arxiv.org/abs/2104.00931) | [code](https://github.com/maum-ai/assem-vc) |
-|               |
-
-## 作业要求
-- 确保可以仅在命令行输入模型和数据集名称就可以训练、验证。（部分仓库没有提供训练代码的，可以不训练）
-- 每个组都要提交一个README文件，写明完成的功能、最终实现的训练、验证截图、所使用的依赖、成员分工等。
-
-
-
+​		为解决 .md 文件出现非本地无法正常显示图片的情况，我们备份了一份同样的 .pdf 文件以防该情况发生。此外，在 Github 上传该项目作业文件中遇到一些传输文件大小受到限制的问题，故我们删去了部分阻碍这一过程的过大的数据集以及保存的模型等内容，在此前的报告内容中也已有截图可证明完成此流程，特此附加说明。
